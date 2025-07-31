@@ -1,0 +1,22 @@
+# docker-compose.yml
+
+version: '3.8'
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    environment:
+      # These are the credentials your app will use to connect.
+      # WARNING: For development only. Use secrets for production.
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: property_management
+    ports:
+      # Exposes the PostgreSQL port 5432 to your local machine.
+      - '5432:5432'
+    volumes:
+      # This line persists your database data even if the container is removed.
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
