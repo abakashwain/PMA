@@ -52,3 +52,6 @@ next-env.d.ts
 
 # docker
 docker-compose.yml # Usually specific to local setup, commit if your team needs it
+
+
+hash-password.js
