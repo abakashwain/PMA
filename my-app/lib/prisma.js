@@ -1,5 +1,4 @@
-// File: src/lib/prisma.js
-
+// File: lib/prisma.js
 import { PrismaClient } from '@prisma/client';
 
 // This prevents multiple instances of Prisma Client in development
