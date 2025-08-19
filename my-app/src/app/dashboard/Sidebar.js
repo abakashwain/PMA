@@ -13,9 +13,17 @@ const navLinks = [
 ];
 
 export default function Sidebar({ user }) {
+  // The session populates user.role with the role *name* (string), not an object
+    const userRole = user?.role.name; 
+
+    if (!userRole) {
+        // Don't render sidebar links if role is not available
+        return null; 
+    }
+
   // Filter the navigation links based on the current user's role
   const accessibleLinks = navLinks.filter(link => 
-    link.roles.includes(user.role.name)
+    link.roles.includes(userRole)
   );
 
   return (

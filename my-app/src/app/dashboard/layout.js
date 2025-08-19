@@ -3,16 +3,17 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
-import { PrismaClient } from '@prisma/client';
-import Sidebar from './Sidebar'; // We will create this component next
+import Sidebar from './Sidebar';
+// import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+
+// const prisma = new PrismaClient();
 
 export default async function DashboardLayout({ children }) {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user) {
-    redirect('/api/auth/signin?callbackUrl=/dashboard');
+    redirect('/login');
   }
 
   // Fetch the full user object, including the role, from the database

@@ -1,17 +1,65 @@
 // File: app/api/auth/[...nextauth]/route.js
 
 import NextAuth from "next-auth";
+import  CredentialsProvider from 'next-auth/providers/credentials';
+
+//The PrismaAdaptor is used for Third Party Providers.
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import prisma from '@/lib/prisma';
-import GoogleProvider from "next-auth/providers/google";
+
+import prisma from '../../../../../lib/prisma';
+import bcrypt from 'bcryptjs';
+
 // Add other providers like CredentialsProvider if you use them
 
 export const authOptions = {
+  
   adapter: PrismaAdapter(prisma),
+
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Passwordd', type: 'password' },
+      },
+      // This is the core logic that runs when a user tries to log in
+      async authorize(credentials) {
+        if (!credentials || !credentials.email || !credentials.password) {
+          return null;
+        }
+
+        // 1. Find the user in your database
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+          include: {
+            role: true, // IMPORTANT: Include the role relation
+          }
+        });
+
+        if (!user) {
+          // Not found
+          return null;
+        }
+
+        // 2. Check if the user has a password (they might be a legacy Google user)
+        if (!user.hashedPassword) {
+          return null;
+        }
+
+        // 3. Compare the provided password with the stored hashed password
+        const passwordsMatch = await bcrypt.compare(
+          credentials.password,
+          user.hashedPassword
+        );
+
+        if (!passwordsMatch) {
+          return null;
+        }
+
+        // 4. If everything is correct, return the user object
+        // The user object will be encoded in the JWT
+        return user;
+      },
     }),
     // ... add more providers here
   ],
@@ -22,16 +70,10 @@ export const authOptions = {
     // This callback adds the role to the JWT token upon sign-in
     async jwt({ token, user }) {
       if (user) {
-        // On sign-in, `user` object is available.
-        // We need to fetch the role name from the related Role model.
-        const userWithRole = await prisma.user.findUnique({
-          where: { id: user.id },
-          include: { role: true },
-        });
-        if (userWithRole) {
-          token.role = userWithRole.role.name; // e.g., "ADMIN" or "USER"
-          token.id = user.id;
-        }
+        // When the user first signs in, the `user` object is available.
+        // We add the user's ID and role to the token.
+        token.id = user.id;
+        token.role = user.role.name;
       }
       return token;
     },
@@ -43,6 +85,10 @@ export const authOptions = {
       }
       return session;
     },
+  },
+  pages: {
+    signIn: '/login', // Redirect users to your custom login page
+    // error: '/auth/error', // You can specify a custom error page
   },
 };
 

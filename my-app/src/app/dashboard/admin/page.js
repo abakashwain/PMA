@@ -1,4 +1,4 @@
-// app/admin/page.jsx
+// app/dashboard/admin/page.jsx
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
@@ -14,13 +14,18 @@ export default async function AdminPage() {
     if (!session) {
         // The default NextAuth sign-in page is at /api/auth/signin
         // The callbackUrl will send them back here after they log in.
-        redirect('/api/auth/signin?callbackUrl=/admin');
+        redirect('/login');
     }
 
-    // 2. If a session exists, render the full interactive dashboard
+    // 2. If the user is not an ADMIN, redirect to the main dashboard
+     if (session.user?.role !== 'Administrator') {
+        redirect('/dashboard');
+    }
+
+    // 3. If the user is an ADMIN, render the dashboard
     return (
         <div className="flex justify-center items-start min-h-screen bg-zinc-950 p-4 sm:p-6 lg:p-8 font-sans">
-            <div className="w-full max-w-6xl p-6 sm:p-8 bg-zinc-900 rounded-2xl shadow-2xl shadow-zinc-950/50">
+            <div className="w-full max-w-7xl p-6 sm:p-8 bg-zinc-900 rounded-2xl shadow-2xl shadow-zinc-950/50">
                 <AdminDashboard />
             </div>
         </div>
