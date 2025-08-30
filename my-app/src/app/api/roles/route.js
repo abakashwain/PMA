@@ -8,7 +8,7 @@ import { authOptions } from '../auth/[...nextauth]/route';
 // GET: Fetch all roles
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
 
@@ -24,7 +24,7 @@ export async function GET() {
 // POST: Create a new role
 export async function POST(request) {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
 

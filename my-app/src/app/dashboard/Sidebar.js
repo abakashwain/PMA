@@ -6,9 +6,9 @@ import LogoutButton from './LogoutButton'; // Import the client component
 
 // Define all possible navigation links and which roles can see them
 const navLinks = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Administrator', 'Manager', 'User'] },
-  { href: '/dashboard/admin', label: 'User Management', icon: Shield, roles: ['Administrator'] },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Administrator', 'Manager'] },
+  { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['ADMIN', 'Manager', 'User'] },
+  { href: '/dashboard/admin', label: 'User Management', icon: Shield, roles: ['ADMIN'] },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['ADMIN', 'Manager'] },
   // Add more links here for other modules...
 ];
 

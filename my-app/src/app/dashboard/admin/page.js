@@ -18,7 +18,7 @@ export default async function AdminPage() {
     }
 
     // 2. If the user is not an ADMIN, redirect to the main dashboard
-     if (session.user?.role !== 'Administrator') {
+     if (session.user?.role !== 'ADMIN') {
         redirect('/dashboard');
     }
 

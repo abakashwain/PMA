@@ -8,7 +8,7 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 // PUT: Update a user
 export async function PUT(request, { params }) {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
 
@@ -43,7 +43,7 @@ export async function PUT(request, { params }) {
 // DELETE: Delete a user
 export async function DELETE(request, { params }) {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
 

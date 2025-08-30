@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 // GET: Fetch all users
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
 
@@ -30,7 +30,7 @@ export async function GET() {
 // POST: Create a new user
 export async function POST(request) {
   const session = await getServerSession(authOptions);
-  if (session?.user?.role !== 'Administrator') {
+  if (session?.user?.role !== 'ADMIN') {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
   
