@@ -9,7 +9,7 @@ if (!password) {
   process.exit(1);
 }
 
-const salt = bcrypt.genSaltSync(12);
+const salt = bcrypt.genSaltSync(10);
 const hashedPassword = bcrypt.hashSync(password, salt);
 
 console.log('Hashed Password:');

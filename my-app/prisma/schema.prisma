@@ -9,56 +9,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- YOUR APPLICATION MODELS ---
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  hashedPassword String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relation to Role (Required)
-  roleId        String
-  role          Role      @relation(fields: [roleId], references: [id])
-
-  // NextAuth required relations
-  accounts      Account[]
-  sessions      Session[]
-}
-
-model Role {
-  id          String  @id @default(cuid())
-  name        String  @unique // e.g., "ADMIN", "USER"
-  permissions String? // e.g., "MANAGE_USERS,VIEW_REPORTS"
-
-  // A role can be assigned to many users
-  users User[]
-}
-
-
 // --- NEXTAUTH REQUIRED MODELS ---
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([provider, providerAccountId])
+  @@map("accounts")
 }
 
 model Session {
@@ -67,12 +35,717 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("sessions")
 }
 
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
-
   @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// -------------------
+// ENUMS: Pre-defined sets of values to ensure data consistency.
+// -------------------
+
+// Defines the application models that permissions can be applied to.
+enum Resource {
+  ZONE
+  ASSET
+  ASSET_ONBOARDING
+  BUILDING
+  SPACE
+  SPACE_TYPE
+  TENANT
+  PREVIOUS_OWNER
+  CONTRACT
+  CONTRACT_STATUS
+  DOCUMENT
+  UTILITY_METER
+  UTILITY_BILL
+  LEGAL_CASE
+  LEGAL_CASE_TYPE
+  KEY
+  KEY_TRANSACTION
+  USER
+  ROLE
+  SYSTEM_SETTING
+}
+
+// A complete log of specific actions performed by users for auditing purposes.
+enum ActivityAction {
+  ZONE_CREATED
+  ZONE_UPDATED
+  ZONE_DELETED
+  ASSET_CREATED
+  ASSET_UPDATED
+  ASSET_DELETED
+  BUILDING_CREATED
+  BUILDING_UPDATED
+  BUILDING_DELETED
+  SPACE_CREATED
+  SPACE_UPDATED
+  SPACE_DELETED
+  SPACE_OCCUPANCY_CHANGED
+  TENANT_CREATED
+  TENANT_UPDATED
+  TENANT_DELETED
+  PREVIOUS_OWNER_CREATED
+  PREVIOUS_OWNER_UPDATED
+  PREVIOUS_OWNER_DELETED
+  LEGAL_CASE_CREATED
+  LEGAL_CASE_STATUS_CHANGED
+  LEGAL_CASE_DELETED
+  CONTRACT_CREATED
+  CONTRACT_APPROVED
+  CONTRACT_REJECTED
+  CONTRACT_UPDATED
+  CONTRACT_DELETED
+  UTILITY_BILL_CREATED
+  UTILITY_BILL_UPDATED
+  UTILITY_BILL_PAID
+  UTILITY_BILL_DELETED
+  KEY_CREATED
+  KEY_UPDATED
+  KEY_DELETED
+  KEY_CHECKED_OUT
+  KEY_CHECKED_IN
+}
+
+// Building Condition Assessment (BCA) results from inspections.
+enum BcaResult {
+  GOOD
+  FAIR
+  POOR
+  CRITICAL
+}
+
+enum BcaType {
+  VISUAL
+  INTRUSIVE
+}
+
+enum OccupancyStatus {
+  VACANT
+  OCCUPIED
+}
+
+enum DocumentType {
+  TITLE_DEED
+  CIVIL_DEFENSE_PERMIT
+  JHD_PERMIT
+  INSURANCE_POLICY
+  OTHER
+}
+
+enum UtilityType {
+  ELECTRICITY
+  WATER
+  GAS
+  OTHER
+}
+
+enum UtilityBillStatus {
+  UNPAID
+  PAID
+  OVERDUE
+}
+
+enum KeyStatus {
+  IN_STORE
+  CHECKED_OUT
+  MISSING
+}
+
+enum KeyTransactionType {
+  CHECK_OUT
+  CHECK_IN
+}
+
+enum LegalCaseStatus {
+  OPEN
+  CLOSED
+  DROPPED
+}
+
+
+// -------------------
+// APPLICATION MODELS
+// -------------------
+
+// --- System & Access Control ---
+
+// Stores global system settings, like VAT rate, that an admin can configure.
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedById String
+  updatedBy   User     @relation("UpdatedSystemSettings", fields: [updatedById], references: [id])
+  @@map("system_settings")
+}
+
+// Defines a user role with a specific set of permissions.
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+  permissions RolePermission[]
+  @@map("roles")
+}
+
+// The bridge between a Role and a Resource, defining what actions are allowed.
+model RolePermission {
+  id         String   @id @default(cuid())
+  resource   Resource
+  canCreate  Boolean  @default(false)
+  canRead    Boolean  @default(false)
+  canUpdate  Boolean  @default(false)
+  canDelete  Boolean  @default(false)
+  canApprove Boolean  @default(false)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  @@unique([roleId, resource])
+  @@map("role_permissions")
+}
+
+// Represents an application user (a member of the leasing team).
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  roleId        String?
+  role          Role?     @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  accounts      Account[]
+  sessions      Session[]
+
+  // --- Full Auditing Relations ---
+  createdTenants        Tenant[]         @relation("CreatedTenants")
+  createdPreviousOwners PreviousOwner[]  @relation("CreatedPreviousOwners")
+  createdLegalCases     LegalCase[]      @relation("CreatedLegalCases")
+  createdLegalCaseTypes LegalCaseType[]  @relation("CreatedLegalCaseTypes")
+  createdContracts      Contract[]       @relation("CreatedContracts")
+  createdContractStatuses ContractStatus[]   @relation("CreatedContractStatuses")
+  createdZones          Zone[]           @relation("CreatedZones")
+  createdAssets         Asset[]          @relation("CreatedAssets")
+  createdBuildings      Building[]       @relation("CreatedBuildings")
+  createdSpaces         Space[]          @relation("CreatedSpaces")
+  createdSpaceTypes     SpaceType[]      @relation("CreatedSpaceTypes")
+  createdDocuments      Document[]       @relation("CreatedDocuments")
+  createdUtilityMeters  UtilityMeter[]   @relation("CreatedUtilityMeters")
+  createdUtilityBills   UtilityBill[]    @relation("CreatedUtilityBills")
+  createdKeys           Key[]            @relation("CreatedKeys")
+  updatedSystemSettings SystemSetting[]  @relation("UpdatedSystemSettings")
+  updatedTenants        Tenant[]         @relation("UpdatedTenants")
+  updatedPreviousOwners PreviousOwner[]  @relation("UpdatedPreviousOwners")
+  updatedLegalCases     LegalCase[]      @relation("UpdatedLegalCases")
+  updatedLegalCaseTypes LegalCaseType[]  @relation("UpdatedLegalCaseTypes")
+  updatedContracts      Contract[]       @relation("UpdatedContracts")
+  updatedContractStatuses ContractStatus[]   @relation("UpdatedContractStatuses")
+  updatedZones          Zone[]           @relation("UpdatedZones")
+  updatedAssets         Asset[]          @relation("UpdatedAssets")
+  updatedBuildings      Building[]       @relation("UpdatedBuildings")
+  updatedSpaces         Space[]          @relation("UpdatedSpaces")
+  updatedSpaceTypes     SpaceType[]      @relation("UpdatedSpaceTypes")
+  updatedDocuments      Document[]       @relation("UpdatedDocuments")
+  updatedUtilityMeters  UtilityMeter[]   @relation("UpdatedUtilityMeters")
+  updatedUtilityBills   UtilityBill[]    @relation("UpdatedUtilityBills")
+  updatedKeys           Key[]            @relation("UpdatedKeys")
+  deletedTenants        Tenant[]         @relation("DeletedTenants")
+  deletedPreviousOwners PreviousOwner[]  @relation("DeletedPreviousOwners")
+  deletedLegalCases     LegalCase[]      @relation("DeletedLegalCases")
+  deletedLegalCaseTypes LegalCaseType[]  @relation("DeletedLegalCaseTypes")
+  deletedContracts      Contract[]       @relation("DeletedContracts")
+  deletedContractStatuses ContractStatus[]   @relation("DeletedContractStatuses")
+  deletedZones          Zone[]           @relation("DeletedZones")
+  deletedAssets         Asset[]          @relation("DeletedAssets")
+  deletedBuildings      Building[]       @relation("DeletedBuildings")
+  deletedSpaces         Space[]          @relation("DeletedSpaces")
+  deletedSpaceTypes     SpaceType[]      @relation("DeletedSpaceTypes")
+  deletedDocuments      Document[]       @relation("DeletedDocuments")
+  deletedUtilityMeters  UtilityMeter[]   @relation("DeletedUtilityMeters")
+  deletedUtilityBills   UtilityBill[]    @relation("DeletedUtilityBills")
+  deletedKeys           Key[]            @relation("DeletedKeys")
+  approvedContracts     Contract[]       @relation("ApprovedContracts")
+  heldKeys              Key[]            @relation("HeldBy")
+  keyTransactions       KeyTransaction[] @relation("PerformedBy")
+  activities            Activity[]
+
+  @@map("users")
+}
+
+
+// --- Tenants, Owners & Legal ---
+
+// Represents the previous owner of an asset.
+model PreviousOwner {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedPreviousOwners", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedPreviousOwners", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedPreviousOwners", fields: [deletedById], references: [id])
+  assets      Asset[]
+  legalCases  LegalCase[]
+  activities  Activity[]
+  @@index([deletedAt])
+  @@map("previous_owners")
+}
+
+// Represents a current tenant (an individual or company) who leases a space.
+model Tenant {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?   @unique
+  phone       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedTenants", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedTenants", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedTenants", fields: [deletedById], references: [id])
+  contracts      Contract[]
+  occupiedSpaces Space[]
+  legalCases     LegalCase[]
+  activities     Activity[]
+
+  @@index([deletedAt])
+  @@map("tenants")
+}
+
+// Admin-configurable categories for legal cases.
+model LegalCaseType {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User        @relation("CreatedLegalCaseTypes", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?       @relation("UpdatedLegalCaseTypes", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?       @relation("DeletedLegalCaseTypes", fields: [deletedById], references: [id])
+  legalCases  LegalCase[]
+
+  @@index([deletedAt])
+  @@map("legal_case_types")
+}
+
+// A central model to track any legal escalation.
+model LegalCase {
+  id              String          @id @default(cuid())
+  caseNumber      String?         @unique
+  status          LegalCaseStatus @default(OPEN)
+  description     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+  createdById     String
+  createdBy       User            @relation("CreatedLegalCases", fields: [createdById], references: [id])
+  updatedById     String?
+  updatedBy       User?           @relation("UpdatedLegalCases", fields: [updatedById], references: [id])
+  deletedById     String?
+  deletedBy       User?           @relation("DeletedLegalCases", fields: [deletedById], references: [id])
+  typeId          String
+  type            LegalCaseType   @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  tenantId        String?
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  previousOwnerId String?
+  previousOwner   PreviousOwner?  @relation(fields: [previousOwnerId], references: [id], onDelete: Cascade)
+  utilityBillId   String?         @unique
+  utilityBill     UtilityBill?    @relation(fields: [utilityBillId], references: [id], onDelete: Cascade)
+  activities      Activity[]
+
+  @@index([deletedAt])
+  @@map("legal_cases")
+}
+
+
+// --- Contracts ---
+
+// Admin-configurable contract statuses (e.g., "Active", "Expired").
+model ContractStatus {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  isLeased    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedContractStatuses", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedContractStatuses", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedContractStatuses", fields: [deletedById], references: [id])
+  contracts   Contract[]
+
+  @@index([deletedAt])
+  @@map("contract_statuses")
+}
+
+// The formal lease agreement for a space.
+model Contract {
+  id                  String    @id @default(cuid())
+  startDate           DateTime
+  endDate             DateTime
+  rentAmount          Float
+  serviceChargeAmount Float     @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+  createdById         String
+  createdBy           User      @relation("CreatedContracts", fields: [createdById], references: [id])
+  updatedById         String?
+  updatedBy           User?     @relation("UpdatedContracts", fields: [updatedById], references: [id])
+  deletedById         String?
+  deletedBy           User?     @relation("DeletedContracts", fields: [deletedById], references: [id])
+  statusId            String
+  status              ContractStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  spaceId             String
+  space               Space          @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  tenantId            String
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  approvedById        String?
+  approvedBy          User?          @relation("ApprovedContracts", fields: [approvedById], references: [id], onDelete: SetNull)
+  utilityBills        UtilityBill[]
+  activities          Activity[]
+
+  @@index([deletedAt])
+  @@map("contracts")
+}
+
+
+// --- Portfolio Hierarchy ---
+
+// The highest-level organizational unit (e.g., a city or region).
+model Zone {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  boundaries  Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedZones", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedZones", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedZones", fields: [deletedById], references: [id])
+  assets      Asset[]
+
+  @@index([deletedAt])
+  @@map("zones")
+}
+
+// A property complex or large portfolio asset.
+model Asset {
+  id                String    @id @default(cuid())
+  name              String
+  expropriationDate DateTime?
+  assetNumber       String?   @unique
+  batchNumber       Int?
+  bcaResult         BcaResult?
+  bcaType           BcaType?
+  address           String?
+  description       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+  createdById       String
+  createdBy         User      @relation("CreatedAssets", fields: [createdById], references: [id])
+  updatedById       String?
+  updatedBy         User?     @relation("UpdatedAssets", fields: [updatedById], references: [id])
+  deletedById       String?
+  deletedBy         User?     @relation("DeletedAssets", fields: [deletedById], references: [id])
+  zoneId            String
+  zone              Zone      @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  previousOwnerId   String?
+  previousOwner     PreviousOwner? @relation(fields: [previousOwnerId], references: [id], onDelete: SetNull)
+  onboarding        AssetOnboarding?
+  documents         Document[]
+  utilityBills      UtilityBill[]
+  meters            UtilityMeter[]
+  buildings         Building[]
+  keys              Key[]
+  activities        Activity[]
+  @@index([deletedAt])
+  @@map("assets")
+}
+
+// A single building within an Asset.
+model Building {
+  id          String    @id @default(cuid())
+  name        String
+  address     String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedBuildings", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedBuildings", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedBuildings", fields: [deletedById], references: [id])
+  assetId     String
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  spaces      Space[]
+  meters      UtilityMeter[]
+  keys        Key[]
+
+  @@index([deletedAt])
+  @@map("buildings")
+}
+
+// Admin-configurable types for spaces (e.g., "Leasable Unit", "MEP Room").
+model SpaceType {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  isLeasable  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedSpaceTypes", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedSpaceTypes", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedSpaceTypes", fields: [deletedById], references: [id])
+  spaces      Space[]
+
+  @@index([deletedAt])
+  @@map("space_types")
+}
+
+// A specific, enclosed area within a building.
+model Space {
+  id              String           @id @default(cuid())
+  name            String
+  area            Float?
+  leaseRate       Float?
+  occupancyStatus OccupancyStatus?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  createdById     String
+  createdBy       User             @relation("CreatedSpaces", fields: [createdById], references: [id])
+  updatedById     String?
+  updatedBy       User?            @relation("UpdatedSpaces", fields: [updatedById], references: [id])
+  deletedById     String?
+  deletedBy       User?            @relation("DeletedSpaces", fields: [deletedById], references: [id])
+  buildingId      String
+  building        Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  spaceTypeId     String
+  spaceType       SpaceType        @relation(fields: [spaceTypeId], references: [id], onDelete: Restrict)
+  occupantId      String?
+  occupant        Tenant?          @relation(fields: [occupantId], references: [id], onDelete: SetNull)
+  contracts       Contract[]
+  meters          UtilityMeter[]
+  keys            Key[]
+  activities      Activity[]
+
+  @@index([deletedAt])
+  @@map("spaces")
+}
+
+// --- Onboarding, Utilities, Keys, etc. ---
+
+// Checklist for asset onboarding.
+model AssetOnboarding {
+  id                    String    @id @default(cuid())
+  assetId               String    @unique
+  asset                 Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  expectedDeedCount     Int       @default(0)
+  expectedBuildingCount Int       @default(0)
+  expectedSpaceCount    Int       @default(0)
+  expectedMeterCount    Int       @default(0)
+  isPermitsRequired     Boolean   @default(false)
+  isInsuranceRequired   Boolean   @default(false)
+  infoGatheredAt        DateTime?
+  deedsRecordedAt       DateTime?
+  buildingsNumberedAt   DateTime?
+  spacesAddedAt         DateTime?
+  keysCollectedAt       DateTime?
+  metersRecordedAt      DateTime?
+  completedAt           DateTime?
+  updatedAt             DateTime  @updatedAt
+  @@map("asset_onboardings")
+}
+
+// Uploaded files.
+model Document {
+  id           String       @id @default(cuid())
+  type         DocumentType
+  fileName     String
+  fileUrl      String
+  reference    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+  createdById  String
+  createdBy    User         @relation("CreatedDocuments", fields: [createdById], references: [id])
+  updatedById  String?
+  updatedBy    User?        @relation("UpdatedDocuments", fields: [updatedById], references: [id])
+  deletedById  String?
+  deletedBy    User?        @relation("DeletedDocuments", fields: [deletedById], references: [id])
+  assetId      String
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([deletedAt])
+  @@map("documents")
+}
+
+// A physical utility meter.
+model UtilityMeter {
+  id             String      @id @default(cuid())
+  serialNumber   String      @unique
+  type           UtilityType
+  accountNumber  String?
+  locationNumber String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+  createdById    String
+  createdBy      User        @relation("CreatedUtilityMeters", fields: [createdById], references: [id])
+  updatedById    String?
+  updatedBy      User?       @relation("UpdatedUtilityMeters", fields: [updatedById], references: [id])
+  deletedById    String?
+  deletedBy      User?       @relation("DeletedUtilityMeters", fields: [deletedById], references: [id])
+  assetId        String?
+  asset          Asset?      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  buildingId     String?
+  building       Building?   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  spaceId        String?
+  space          Space?      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  bills          UtilityBill[]
+
+  @@index([deletedAt])
+  @@map("utility_meters")
+}
+
+// A bill received from a utility provider.
+model UtilityBill {
+  id                 String            @id @default(cuid())
+  billStartDate      DateTime
+  billEndDate        DateTime
+  consumption        Float
+  amount             Float
+  dueDate            DateTime
+  status             UtilityBillStatus @default(UNPAID)
+  isPreExpropriation Boolean           @default(false)
+  paidAt             DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deletedAt          DateTime?
+  createdById        String
+  createdBy          User              @relation("CreatedUtilityBills", fields: [createdById], references: [id])
+  updatedById        String?
+  updatedBy          User?             @relation("UpdatedUtilityBills", fields: [updatedById], references: [id])
+  deletedById        String?
+  deletedBy          User?             @relation("DeletedUtilityBills", fields: [deletedById], references: [id])
+  meterId            String
+  meter              UtilityMeter      @relation(fields: [meterId], references: [id], onDelete: Restrict)
+  contractId         String?
+  contract           Contract?         @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  assetId            String?
+  asset              Asset?            @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  legalCase          LegalCase?
+
+  @@index([deletedAt])
+  @@map("utility_bills")
+}
+
+// A physical key.
+model Key {
+  id        String    @id @default(cuid())
+  keyCode   String    @unique
+  status    KeyStatus @default(IN_STORE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdById String
+  createdBy   User      @relation("CreatedKeys", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("UpdatedKeys", fields: [updatedById], references: [id])
+  deletedById String?
+  deletedBy   User?     @relation("DeletedKeys", fields: [deletedById], references: [id])
+  heldById  String?
+  heldBy    User?     @relation("HeldBy", fields: [heldById], references: [id], onDelete: SetNull)
+  assetId   String?
+  asset     Asset?    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  buildingId String?
+  building  Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  spaceId   String?
+  space     Space?    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  transactions KeyTransaction[]
+
+  @@index([deletedAt])
+  @@map("keys")
+}
+
+// A log of a key transaction.
+model KeyTransaction {
+  id            String             @id @default(cuid())
+  type          KeyTransactionType
+  notes         String?
+  createdAt     DateTime           @default(now())
+  keyId         String
+  key           Key                @relation(fields: [keyId], references: [id], onDelete: Restrict)
+  performedById String
+  performedBy   User               @relation("PerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  @@map("key_transactions")
+}
+
+// --- Auditing Log ---
+model Activity {
+  id        String         @id @default(cuid())
+  action    ActivityAction
+  details   Json?
+  createdAt DateTime       @default(now())
+
+  // The user who performed the action.
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // CORRECTED: Explicit, optional relations to all trackable entities.
+  // An activity log will only be linked to ONE of these at a time.
+  tenantId        String?
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  previousOwnerId String?
+  previousOwner   PreviousOwner?  @relation(fields: [previousOwnerId], references: [id], onDelete: SetNull)
+  contractId      String?
+  contract        Contract?       @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  legalCaseId     String?
+  legalCase       LegalCase?      @relation(fields: [legalCaseId], references: [id], onDelete: SetNull)
+  assetId         String?
+  asset           Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  spaceId         String?
+  space           Space?          @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+
+  @@map("activities")
 }

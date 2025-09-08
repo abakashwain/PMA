@@ -42,7 +42,7 @@ export async function POST(request) {
       data: {
         name,
         email,
-        hashedPassword: hashedPassword, // Make sure field name matches schema
+        password: hashedPassword, // Make sure field name matches schema
         roleId: userRole.id, // Assign the roleId
       },
     });
